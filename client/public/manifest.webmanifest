@@ -1,0 +1,13 @@
+{
+  "name": "Auction Arena — Live Franchise Auction Game",
+  "short_name": "Auction Arena",
+  "description": "Host a real-time franchise auction with friends or nine AI owners. Bid, build a squad, win the table.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#05070f",
+  "theme_color": "#05070f",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
