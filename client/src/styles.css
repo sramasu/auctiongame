@@ -1,0 +1,205 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #05070f;
+  color: #e7ecf7;
+  font-family: "Outfit", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Stadium-night backdrop */
+.arena-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 12% -8%, rgba(245, 185, 41, 0.16), transparent 60%),
+    radial-gradient(800px 520px at 92% 4%, rgba(56, 130, 246, 0.16), transparent 62%),
+    radial-gradient(1100px 700px at 50% 118%, rgba(16, 185, 129, 0.14), transparent 65%),
+    linear-gradient(180deg, #05070f 0%, #070b16 45%, #05070f 100%);
+}
+
+.arena-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 90% 65% at 50% 0%, #000 30%, transparent 78%);
+}
+
+.floodlight {
+  position: fixed;
+  top: -30vh;
+  width: 60vw;
+  height: 90vh;
+  filter: blur(70px);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@layer components {
+  .panel {
+    @apply relative rounded-2xl border border-white/8 bg-night-850/70 backdrop-blur-xl shadow-panel;
+  }
+  .panel-flat {
+    @apply rounded-xl border border-white/6 bg-night-800/60;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+      transition-all duration-150 active:scale-[.97] disabled:opacity-40 disabled:pointer-events-none
+      select-none;
+  }
+  .btn-gold {
+    @apply btn text-night-950 bg-gradient-to-b from-gold-300 to-gold-500 hover:from-gold-400 hover:to-gold-600 shadow-glow;
+  }
+  .btn-primary {
+    @apply btn text-white bg-gradient-to-b from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 shadow-lift;
+  }
+  .btn-ghost {
+    @apply btn text-slate-200 bg-white/6 border border-white/10 hover:bg-white/12 hover:border-white/20;
+  }
+  .btn-danger {
+    @apply btn text-white bg-gradient-to-b from-flare-500 to-flare-600 hover:from-flare-400 shadow-lift;
+  }
+  .btn-turf {
+    @apply btn text-night-950 bg-gradient-to-b from-turf-400 to-turf-600 hover:brightness-110 shadow-lift;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300;
+  }
+  .input {
+    @apply w-full rounded-xl border border-white/12 bg-night-900/80 px-4 py-3 text-sm text-slate-100
+      placeholder:text-slate-500 outline-none transition focus:border-gold-400/60 focus:ring-2 focus:ring-gold-400/20;
+  }
+  .label {
+    @apply mb-1.5 block text-[11px] font-bold uppercase tracking-[.16em] text-slate-400;
+  }
+  .stat-num {
+    @apply font-display text-2xl leading-none tracking-wide;
+  }
+  .divider {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-white/12 to-transparent;
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scroll-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 99px; }
+  .scroll-thin::-webkit-scrollbar-track { background: transparent; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .no-tap { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+  .glass { background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); }
+  .shimmer-text {
+    background: linear-gradient(90deg, #ffe9a8 0%, #fff8dd 25%, #f5b929 50%, #fff8dd 75%, #ffe9a8 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 3.4s linear infinite;
+  }
+  .ring-gold { box-shadow: 0 0 0 2px rgba(245,185,41,.55), 0 10px 40px -12px rgba(245,185,41,.5); }
+  .card-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+  .card-sheen::before {
+    content: "";
+    position: absolute;
+    inset: -40% -60%;
+    background: linear-gradient(115deg, transparent 42%, rgba(255,255,255,.16) 50%, transparent 58%);
+    transform: translateX(-120%);
+    transition: transform .9s ease;
+  }
+  .card-sheen:hover::before { transform: translateX(120%); }
+}
+
+/* Countdown ring */
+.timer-ring { transform: rotate(-90deg); }
+.timer-ring circle { transition: stroke .3s ease; }
+
+/* Confetti pieces */
+.confetti-piece {
+  position: absolute;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  will-change: transform, opacity;
+}
+
+@keyframes confettiFall {
+  0% { transform: translate3d(0, -10vh, 0) rotateZ(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--dx, 0), 105vh, 0) rotateZ(var(--rz, 720deg)); opacity: .9; }
+}
+
+@keyframes bidFlash {
+  0% { background-color: rgba(245,185,41,.35); }
+  100% { background-color: transparent; }
+}
+.bid-flash { animation: bidFlash .7s ease-out; }
+
+@keyframes stampIn {
+  0% { transform: scale(2.4) rotate(-14deg); opacity: 0; filter: blur(8px); }
+  55% { transform: scale(.92) rotate(-9deg); opacity: 1; filter: blur(0); }
+  100% { transform: scale(1) rotate(-9deg); opacity: 1; }
+}
+.stamp { animation: stampIn .5s cubic-bezier(.2,1.3,.4,1) both; }
+
+@keyframes slideUpFade {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.slide-up { animation: slideUpFade .28s ease-out both; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track { display: flex; width: max-content; animation: marquee 40s linear infinite; }
+
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  20% { transform: scale(1.09); }
+  40% { transform: scale(1); }
+  60% { transform: scale(1.05); }
+}
+.heartbeat { animation: heartbeat 1s ease-in-out infinite; }
+
+@keyframes urgentPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(244,63,94,.55); }
+  50% { box-shadow: 0 0 0 14px rgba(244,63,94,0); }
+}
+.urgent { animation: urgentPulse .9s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+/* Mobile polish */
+@media (max-width: 640px) {
+  .stat-num { font-size: 1.35rem; }
+}

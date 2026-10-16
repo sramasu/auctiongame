@@ -1,0 +1,41 @@
+{
+  "name": "auction-arena",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Auction Arena - real-time multiplayer sports auction game",
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:server dev:client",
+    "dev:server": "node --watch server/src/index.js",
+    "dev:client": "cd client && vite",
+    "build": "cd client && vite build",
+    "start": "node server/src/index.js",
+    "serve": "npm run build && npm run start",
+    "test": "node tests/smoke.js",
+    "test:ui": "esbuild tests/ui.test.jsx --bundle --platform=browser --format=esm --outfile=.uitest/ui.test.mjs --jsx=automatic --define:process.env.NODE_ENV='\"development\"' --log-level=warning && node tests/ui.run.mjs",
+    "test:all": "npm test && npm run test:ui"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "compression": "^1.8.2",
+    "express": "^4.22.3",
+    "framer-motion": "^11.18.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io": "^4.8.4",
+    "socket.io-client": "^4.8.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "autoprefixer": "^10.6.1",
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.1.3",
+    "npm-run-all": "^4.1.5",
+    "postcss": "^8.5.30",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^7.0.2",
+    "vite": "^5.4.21"
+  }
+}
