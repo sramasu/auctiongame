@@ -17,6 +17,7 @@ export function StoreProvider({ children }) {
   const [bidPulse, setBidPulse] = useState(0);
   const [rooms, setRooms] = useState([]);
   const [restoring, setRestoring] = useState(false);
+  const [stats, setStats] = useState({});
   const eventId = useRef(1);
 
   const socketRef = useRef(null);
@@ -107,6 +108,12 @@ export function StoreProvider({ children }) {
     const onUndo = (data) => fire("undo", data);
     const onFull = (data) => setPayload(data);
 
+    const onStats = (data) => {
+      if (data?.playerId && data?.stats) {
+        setStats((prev) => ({ ...prev, [data.playerId]: data.stats }));
+      }
+    };
+
     s.on("connect", onConnect);
     s.on("disconnect", onDisconnect);
     s.on("connect_error", onConnectError);
@@ -130,6 +137,7 @@ export function StoreProvider({ children }) {
     s.on("accelerated", onAccelerated);
     s.on("auction-start", onAuctionStart);
     s.on("room:full", onFull);
+    s.on("stats", onStats);
 
     if (s.connected) onConnect();
 
@@ -139,7 +147,8 @@ export function StoreProvider({ children }) {
       s.off("bid", onBid); s.off("sold", onSold); s.off("unsold", onUnsold); s.off("rtm", onRtm);
       s.off("phase", onPhase); s.off("player", onPlayer); s.off("results", onResults); s.off("pass", onPass);
       s.off("settings", onSettings); s.off("participants", onParticipants); s.off("teams", onTeams);
-      s.off("kicked", onKicked); s.off("undo", onUndo); s.off("accelerated", onAccel); s.off("room:full", onFull);
+      s.off("kicked", onKicked); s.off("undo", onUndo); s.off("accelerated", onAccelerated); s.off("room:full", onFull);
+      s.off("stats", onStats);
     };
   }, [fire, notify, refreshPayload]);
 
@@ -160,6 +169,7 @@ export function StoreProvider({ children }) {
 
   const createRoom = useCallback(async (opts) => enterRoom(await emit("room:create", opts)), [enterRoom]);
   const joinRoom = useCallback(async (opts) => enterRoom(await emit("room:join", opts)), [enterRoom]);
+  const joinLive = useCallback(async (opts) => enterRoom(await emit("room:join-live", opts)), [enterRoom]);
   const rejoin = useCallback(async () => {
     const sess = sessionRef.current;
     if (!sess) return { ok: false, error: "No saved seat" };
@@ -214,8 +224,8 @@ export function StoreProvider({ children }) {
 
   const value = {
     conn, payload, live, session, prefs, toast, event, bidPulse, rooms, restoring,
-    playersById, me, myTeam, mergedTeams, isHost, current, currentPlayer,
-    setPrefs, notify, fire, createRoom, joinRoom, rejoin, leaveRoom, refreshRooms, refreshPayload, act,
+    playersById, me, myTeam, mergedTeams, isHost, current, currentPlayer, stats,
+    setPrefs, notify, fire, createRoom, joinRoom, joinLive, rejoin, leaveRoom, refreshRooms, refreshPayload, act,
     socket: socketRef,
     serverTime: live?.serverTime || payload?.serverTime || Date.now(),
     status: live?.status || payload?.status || "lobby",

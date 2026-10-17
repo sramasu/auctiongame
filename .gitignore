@@ -3,3 +3,4 @@ client/dist/
 .uitest/
 *.log
 .DS_Store
+.env

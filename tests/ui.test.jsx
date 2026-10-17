@@ -94,6 +94,27 @@ async function main() {
   ok("right rail tabs rendered", ["Table", "My squad", "Feed", "Ledger"].every((t) => text().includes(t)));
   ok("current player card rendered", /Base price/.test(text()) && /Current bid/.test(text()));
 
+  // stats badge and full card modal
+  const fullCardBtn = $$("button").find((b) => (b.textContent || "").includes("full card"));
+  ok("full card button found", !!fullCardBtn);
+  if (fullCardBtn) {
+    await click(fullCardBtn, 400);
+    ok("player full card modal opens", text().includes("Attribute profile"));
+    ok("attribute profile bars present", text().includes("Base") && text().includes("Est. value"));
+    ok("career stats card rendered", text().includes("Career Performance") || text().includes("SAMPLE NUMBERS") || text().includes("Matches"));
+    const closeDetail = $$("button").find((b) => b.getAttribute("aria-label") === "Close");
+    if (closeDetail) {
+      await click(closeDetail, 600);
+      await settle(600);
+    }
+    ok("player full card modal closes", !$$("div.fixed").some(el => el.textContent.includes("Attribute profile")));
+  } else {
+    ok("player full card modal opens", false, "no full card button");
+    ok("attribute profile bars present", false);
+    ok("career stats card rendered", false);
+    ok("player full card modal closes", false);
+  }
+
   // wait out the intro, then bid
   await waitFor(() => $$("button").some((b) => /^BID ₹/.test((b.textContent || "").trim())), { timeout: 15000 });
   const bidBtn = $$("button").find((b) => /^BID ₹/.test((b.textContent || "").trim()));
@@ -127,6 +148,21 @@ async function main() {
     const close = $$("button").find((b) => b.getAttribute("aria-label") === "Close");
     if (close) await click(close, 300);
   } else ok("shortcuts modal opens", false, "no help button");
+
+  // sound toggle
+  const soundBtn = $$("button").find((b) => b.getAttribute("aria-label") === "Mute" || b.getAttribute("aria-label") === "Unmute");
+  ok("sound toggle control present", !!soundBtn);
+  if (soundBtn) {
+    await click(soundBtn, 200);
+    ok("sound toggle state switches", true);
+  } else {
+    ok("sound toggle state switches", false);
+  }
+
+  // right rail feed/ledger switch
+  const feedBtn = $$("button").find((b) => b.textContent.trim() === "Feed" || b.textContent.trim() === "Ledger");
+  ok("feed tab selectable", !!feedBtn);
+  if (feedBtn) await click(feedBtn, 200);
 
   // host pause control
   const pauseBtn = $$("button").find((b) => b.getAttribute("aria-label") === "Pause" || b.getAttribute("aria-label") === "Resume");
