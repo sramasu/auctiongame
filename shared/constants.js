@@ -15,7 +15,16 @@ export const SPORTS = {
     icon: "⚽",
     roles: ["GK", "DEF", "MID", "FWD"],
     domestic: null,
-    defaults: { minSquad: 20, maxSquad: 28, maxOverseas: null, overseasInXI: null },
+    defaults: { minSquad: 18, maxSquad: 25, maxOverseas: null, overseasInXI: null },
+  },
+  kabaddi: {
+    id: "kabaddi",
+    label: "Kabaddi",
+    icon: "🤼",
+    roles: ["RAID", "DEF_C", "DEF_V", "AR"],
+    domestic: "IN",
+    defaults: { minSquad: 10, maxSquad: 14, maxOverseas: 2, overseasInXI: 1 },
+    budgetCr: 5,
   },
 };
 
@@ -89,24 +98,31 @@ export const DEFAULT_SETTINGS = {
 };
 
 // Auction ladder: increment depends on where the current bid sits.
-export function incrementFor(amountL) {
-  if (amountL < 100) return 5; // below ₹1 Cr
+export function incrementFor(amountL, sport = "cricket") {
+  if (sport === "kabaddi") {
+    if (amountL < 20) return 1;
+    if (amountL < 50) return 2;
+    if (amountL < 100) return 5;
+    return 10;
+  }
+  if (amountL < 100) return 5; // below ₹1 Cr / €1M
   if (amountL < 200) return 10; // ₹1 Cr – ₹2 Cr
   if (amountL < 500) return 25; // ₹2 Cr – ₹5 Cr
   return 50; // above ₹5 Cr
 }
 
-export function nextBid(amountL) {
-  return amountL + incrementFor(amountL);
+export function nextBid(amountL, sport = "cricket") {
+  return amountL + incrementFor(amountL, sport);
 }
 
 export function normalizeBid(amountL) {
   return Math.round(amountL / 5) * 5;
 }
 
-export const TIER_ORDER = ["MARQUEE", "ELITE", "CORE", "SUPPORT", "EMERGING"];
+export const TIER_ORDER = ["LEGENDS", "MARQUEE", "ELITE", "CORE", "SUPPORT", "EMERGING"];
 
 export const TIER_LABEL = {
+  LEGENDS: "All-Time Legends",
   MARQUEE: "Marquee",
   ELITE: "Elite",
   CORE: "Core",
@@ -117,6 +133,7 @@ export const TIER_LABEL = {
 export const ROLE_SET_ORDER = {
   cricket: ["BAT", "WK", "AR", "PACE", "SPIN"],
   football: ["FWD", "MID", "DEF", "GK"],
+  kabaddi: ["RAID", "DEF_C", "DEF_V", "AR"],
 };
 
 export const ROLE_SET_NAME = {
@@ -129,6 +146,9 @@ export const ROLE_SET_NAME = {
   MID: "Midfielders",
   DEF: "Defenders",
   GK: "Goalkeepers",
+  RAID: "Raiders",
+  DEF_C: "Corner Defenders",
+  DEF_V: "Cover Defenders",
 };
 
 export const MAX_HUMAN_PLAYERS = 10;

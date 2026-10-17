@@ -232,10 +232,11 @@ export function placeBid(room, participantId, requestedAmount, opts = {}) {
   // long war always converges instead of resetting forever.
   const now = Date.now();
   const base = room.settings.resetSeconds * 1000;
-  const taper = Math.max(0.45, 1 - (cur.bidCount - 1) * 0.055);
-  const resetMs = cur.bidCount >= MAX_EXTENSIONS ? 0 : Math.max(2000, base * taper);
+  const taper = Math.max(0.4, 1 - (cur.bidCount - 1) * 0.06);
+  const minFloor = Math.min(1200, Math.round(base * 0.4));
+  const resetMs = cur.bidCount >= MAX_EXTENSIONS ? 0 : Math.max(minFloor, base * taper);
   if (resetMs > 0 && cur.endsAt - now < resetMs) cur.endsAt = now + resetMs;
-  else if (resetMs === 0 && cur.endsAt - now > 2500) cur.endsAt = now + 2500; // final call
+  else if (resetMs === 0 && cur.endsAt - now > 2000) cur.endsAt = now + 2000; // final call
 
   pushFeed(room, "bid", fill(cur.bidCount > 6 ? COMMENTARY.war : COMMENTARY.bid, {
     team: team.name, amount: money(amount), name: player.name,
@@ -309,8 +310,21 @@ export function tickRoom(room, now) {
     return;
   }
 
-  if (cur.phase === "rtm" && now >= cur.endsAt) {
-    finalizeSale(room, cur.leaderId, cur.bidL, null);
+  if (cur.phase === "rtm") {
+    if (cur.rtmBotPlanned?.length) {
+      for (const plan of cur.rtmBotPlanned) {
+        if (plan.done) continue;
+        if (now >= plan.at) {
+          plan.done = true;
+          applyRTM(room, plan.teamId);
+          return;
+        }
+      }
+    }
+    if (now >= cur.endsAt) {
+      finalizeSale(room, cur.leaderId, cur.bidL, null);
+      return;
+    }
     return;
   }
 
@@ -362,12 +376,13 @@ function blockedByOverseas(room, team, player) {
 function scheduleBotRtm(room, eligible, player) {
   const cur = room.current;
   cur.rtmBotPlanned = [];
+  const rtmScale = Math.min(1, Math.max(0.2, (room.settings.rtmWindowSeconds || 8) / 8));
   for (const team of eligible) {
     const owner = room.participants.find((p) => p.teamId === team.id);
     if (!owner?.isBot) continue;
     const ceiling = botCeiling(room, owner, team, player);
     const want = ceiling >= cur.bidL * 1.02 && Math.random() < (owner.style === "collector" ? 0.55 : 0.3);
-    if (want) cur.rtmBotPlanned.push({ teamId: team.id, at: Date.now() + 1200 + Math.random() * (room.settings.rtmWindowSeconds * 700) });
+    if (want) cur.rtmBotPlanned.push({ teamId: team.id, at: Date.now() + (300 + Math.random() * (room.settings.rtmWindowSeconds * 500)) * rtmScale });
   }
 }
 
@@ -602,6 +617,7 @@ function planBots(room) {
   const player = room.playersMap.get(cur.playerId);
   const now = Date.now();
   room.botPlans = {};
+  const speedScale = Math.min(1, Math.max(0.15, (room.settings.bidSeconds || 20) / 18));
   for (const bot of room.participants.filter((p) => p.isBot && p.teamId)) {
     const team = room.teams[bot.teamId];
     if (!team || team.purseLeftL < player.base) continue;
@@ -612,9 +628,9 @@ function planBots(room) {
     const appeal = clamp((ceiling - player.base) / Math.max(1, ceiling) + (bot.wishlist?.has(player.id) ? 0.25 : 0), 0, 1);
     const engageChance = bot.style === "frugal" ? 0.45 : bot.style === "aggressive" ? 0.85 : 0.65;
     if (Math.random() > appeal * engageChance + 0.06) continue;
-    const [lo, hi] = STYLE_DELAY[bot.style] || STYLE_DELAY.balanced;
+    const [lo, hi] = (STYLE_DELAY[bot.style] || STYLE_DELAY.balanced).map((v) => v * speedScale);
     const delay = lo + Math.random() * (hi - lo);
-    const shrewdWait = bot.style === "shrewd" ? Math.max(delay, room.settings.bidSeconds * 1000 - 2600 - Math.random() * 900) : delay;
+    const shrewdWait = bot.style === "shrewd" ? Math.max(delay, (room.settings.bidSeconds * 1000) * 0.45) : delay;
     room.botPlans[bot.id] = { ceiling, nextAt: now + shrewdWait, engaged: false, style: bot.style };
   }
 }
@@ -622,6 +638,7 @@ function planBots(room) {
 function botAct(room, now) {
   const cur = room.current;
   if (!cur || cur.phase !== "bidding") return;
+  const speedScale = Math.min(1, Math.max(0.15, (room.settings.bidSeconds || 20) / 18));
   for (const bot of room.participants.filter((p) => p.isBot && p.teamId)) {
     const plan = room.botPlans[bot.id];
     if (!plan) continue;
@@ -636,32 +653,20 @@ function botAct(room, now) {
     if (amount > plan.ceiling || amount > team.purseLeftL) { delete room.botPlans[bot.id]; continue; }
     // Cold feet as the price closes in on what the bot thinks he is worth.
     if (headroom > 0.82 && Math.random() < (headroom - 0.82) * 2.6) { delete room.botPlans[bot.id]; continue; }
-    const pressure = remaining < 2500 ? 1 : remaining < 6000 ? 0.8 : 0.6;
+    const pressure = remaining < 2500 * speedScale ? 1 : remaining < 6000 * speedScale ? 0.8 : 0.6;
     if (Math.random() > pressure * (plan.engaged ? 0.94 : 0.86)) {
-      const [lo, hi] = STYLE_DELAY[plan.style] || STYLE_DELAY.balanced;
+      const [lo, hi] = (STYLE_DELAY[plan.style] || STYLE_DELAY.balanced).map((v) => v * speedScale);
       const think = plan.style === "shrewd"
-        ? Math.max(400, remaining * (0.35 + Math.random() * 0.4))
+        ? Math.max(200 * speedScale, remaining * (0.2 + Math.random() * 0.3))
         : lo + Math.random() * (hi - lo);
-      plan.nextAt = Math.min(now + think, cur.endsAt - 120);
+      plan.nextAt = Math.min(now + think, cur.endsAt - 50);
       continue;
     }
     plan.engaged = true;
     const res = placeBid(room, bot.id, amount, { byBot: true });
-    const [lo, hi] = STYLE_DELAY[plan.style] || STYLE_DELAY.balanced;
+    const [lo, hi] = (STYLE_DELAY[plan.style] || STYLE_DELAY.balanced).map((v) => v * speedScale);
     plan.nextAt = now + lo + Math.random() * (hi - lo);
     if (!res.ok) delete room.botPlans[bot.id];
-  }
-
-  // Bot RTM usage
-  if (cur.rtmBotPlanned?.length) {
-    for (const plan of cur.rtmBotPlanned) {
-      if (plan.done) continue;
-      if (now >= plan.at) {
-        plan.done = true;
-        applyRTM(room, plan.teamId);
-        return;
-      }
-    }
   }
 }
 

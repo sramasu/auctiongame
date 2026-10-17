@@ -1,16 +1,29 @@
 export function formatMoney(lakhs, opts = {}) {
-  const { symbol = "₹", compact = false } = opts;
+  const { symbol, compact = false, sport = "cricket" } = typeof opts === "string" ? { sport: opts } : opts;
   if (lakhs == null || Number.isNaN(lakhs)) return "—";
+
+  if (sport === "football") {
+    const sym = symbol || "€";
+    const m = lakhs / 100;
+    const s = compact && m >= 10 ? m.toFixed(0) : m.toFixed(2).replace(/\.?0+$/, "");
+    return `${sym}${s}M`;
+  }
+
+  const sym = symbol || "₹";
   if (lakhs >= 100) {
     const cr = lakhs / 100;
     const s = compact && cr >= 10 ? cr.toFixed(0) : cr.toFixed(2).replace(/\.?0+$/, "");
-    return `${symbol}${s} Cr`;
+    return `${sym}${s} Cr`;
   }
-  return `${symbol}${lakhs} L`;
+  return `${sym}${lakhs} L`;
 }
 
-export function shortMoney(lakhs) {
+export function shortMoney(lakhs, sport = "cricket") {
   if (lakhs == null) return "—";
+  if (sport === "football") {
+    const m = lakhs / 100;
+    return `€${m.toFixed(lakhs % 100 === 0 ? 0 : 1)}M`;
+  }
   if (lakhs >= 100) return `₹${(lakhs / 100).toFixed(lakhs % 100 === 0 ? 0 : 2)} Cr`;
   return `₹${lakhs} L`;
 }

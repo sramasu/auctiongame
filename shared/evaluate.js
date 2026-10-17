@@ -5,28 +5,30 @@ import { clamp } from "./format.js";
 const XI_SHAPES = {
   cricket: { WK: 1, BAT: 4, AR: 2, PACE: 2, SPIN: 2 },
   football: { GK: 1, DEF: 4, MID: 3, FWD: 3 },
+  kabaddi: { RAID: 3, DEF_C: 2, DEF_V: 1, AR: 1 },
 };
 
-// Cricket: a batter can cover for a wicket-keeper slot only if no WK available,
-// all-rounders cover batting and bowling slots, etc.
+// Cricket / Football / Kabaddi role fit:
 function roleFit(role, slot) {
   if (role === slot) return 1;
   if (role === "AR") return 0.95;
   if (slot === "WK" && role === "BAT") return 0.6;
   if ((slot === "BAT" || slot === "AR") && role === "WK") return 0.8;
   if (slot === "BAT" && role === "AR") return 0.95;
+  if ((slot === "DEF_C" || slot === "DEF_V") && (role === "DEF_C" || role === "DEF_V")) return 0.85;
   return 0.2;
 }
 
 /**
- * Build the strongest plausible XI from a squad.
+ * Build the strongest plausible XI / Starting 7 from a squad.
  * @param {Array} squad player objects (must include role, rating, overseas)
- * @param {string} sport 'cricket' | 'football'
+ * @param {string} sport 'cricket' | 'football' | 'kabaddi'
  * @param {object} opts { overseasInXI }
  */
 export function bestXI(squad, sport = "cricket", opts = {}) {
   const shape = XI_SHAPES[sport] || XI_SHAPES.cricket;
-  const maxOverseas = opts.overseasInXI ?? 4;
+  const targetXI = sport === "kabaddi" ? 7 : 11;
+  const maxOverseas = opts.overseasInXI ?? (sport === "kabaddi" ? 1 : 4);
   const pool = squad.slice().sort((a, b) => b.rating - a.rating);
   const chosen = [];
   const usedIds = new Set();
@@ -53,13 +55,17 @@ export function bestXI(squad, sport = "cricket", opts = {}) {
   };
 
   // Fill specialist slots first (scarcest), then flex slots.
-  const order = sport === "cricket" ? ["WK", "SPIN", "PACE", "AR", "BAT"] : ["GK", "DEF", "MID", "FWD"];
+  const order = sport === "cricket"
+    ? ["WK", "SPIN", "PACE", "AR", "BAT"]
+    : sport === "kabaddi"
+      ? ["DEF_C", "DEF_V", "AR", "RAID"]
+      : ["GK", "DEF", "MID", "FWD"];
   for (const slot of order) {
     const need = shape[slot] || 0;
     for (let i = 0; i < need; i++) take(slot);
   }
   // Backfill from whoever is left if the squad is thin.
-  while (chosen.length < 11 && pool.length > chosen.length) {
+  while (chosen.length < targetXI && pool.length > chosen.length) {
     const remaining = pool.find((p) => !usedIds.has(p.id));
     if (!remaining) break;
     const osCount = chosen.filter((c) => c.overseas).length;
@@ -107,6 +113,10 @@ export function squadIssues(squad, settings, sport = "cricket") {
     if ((counts.PACE || 0) < 3) issues.push({ level: "info", text: "Pace attack looks short" });
     const batters = (counts.BAT || 0) + (counts.WK || 0);
     if (batters < 5) issues.push({ level: "warn", text: "Batting depth is short" });
+  } else if (sport === "kabaddi") {
+    if ((counts.RAID || 0) < 3) issues.push({ level: "warn", text: "Raiding department looks thin (need 3+)" });
+    if (((counts.DEF_C || 0) + (counts.DEF_V || 0)) < 4) issues.push({ level: "warn", text: "Defense needs at least 4 specialists" });
+    if ((counts.AR || 0) < 1) issues.push({ level: "info", text: "An all-rounder would add clutch revivals" });
   } else {
     if ((counts.GK || 0) < 2) issues.push({ level: "warn", text: "Need at least two goalkeepers" });
     if ((counts.DEF || 0) < 6) issues.push({ level: "warn", text: "Defensive cover is thin" });
@@ -119,7 +129,7 @@ export function squadIssues(squad, settings, sport = "cricket") {
 /**
  * Overall squad report: rating, XI, balance, grade.
  */
-export function evaluateSquad(squad, { sport = "cricket", settings = {}, purseLeftL = 0, spentL = 0 } = {}) {
+export function evaluateSquad(squad, { sport = "cricket", settings = {}, purseLeftL = 0, spentL = 0, coaches = {} } = {}) {
   const xi = bestXI(squad, sport, { overseasInXI: settings.overseasInXI ?? SPORTS[sport]?.defaults?.overseasInXI ?? 4 });
   const xiRating = xi.length ? xi.reduce((a, p) => a + p.rating, 0) / xi.length : 0;
   const counts = roleCounts(squad);
@@ -128,7 +138,9 @@ export function evaluateSquad(squad, { sport = "cricket", settings = {}, purseLe
   // Balance score: how close to the ideal role distribution (0..1)
   const ideal = sport === "cricket"
     ? { WK: 2, BAT: 7, AR: 5, PACE: 6, SPIN: 4 }
-    : { GK: 3, DEF: 8, MID: 8, FWD: 6 };
+    : sport === "kabaddi"
+      ? { RAID: 5, DEF_C: 4, DEF_V: 3, AR: 2 }
+      : { GK: 3, DEF: 8, MID: 8, FWD: 6 };
   let balErr = 0;
   for (const r of Object.keys(ideal)) {
     balErr += Math.abs((counts[r] || 0) - ideal[r]) / ideal[r];

@@ -16,6 +16,14 @@ const DIST = path.join(ROOT, "client/dist");
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
 
+import { KABADDI_PLAYERS } from "../../shared/players.kabaddi.js";
+import { COACHES, COACH_TYPES } from "../../shared/coaches.js";
+import {
+  simulateCricketMatch, simulateFootballMatch, simulateKabaddiMatch,
+  getOfficialSquad, buildBalancedAiTeam, OFFICIAL_ROSTERS,
+} from "../../shared/match.js";
+import { getTeamsForSport } from "../../shared/teams.js";
+
 const app = express();
 app.use(compression());
 app.use(express.json({ limit: "256kb" }));
@@ -23,9 +31,42 @@ app.use(express.json({ limit: "256kb" }));
 app.get("/api/health", (_req, res) => res.json({ ok: true, rooms: rooms.size, uptime: process.uptime() }));
 app.get("/api/rooms", (_req, res) => res.json({ ok: true, rooms: listPublicRooms() }));
 app.get("/api/pool", (req, res) => {
-  const sport = req.query.sport === "football" ? "football" : "cricket";
-  const list = sport === "football" ? FOOTBALL_PLAYERS : CRICKET_PLAYERS;
-  res.json({ ok: true, sport, count: list.length, players: list.slice(0, Number(req.query.limit || 60)) });
+  const sport = req.query.sport;
+  const list = sport === "football" ? FOOTBALL_PLAYERS : sport === "kabaddi" ? KABADDI_PLAYERS : CRICKET_PLAYERS;
+  res.json({ ok: true, sport: sport || "cricket", count: list.length, players: list.slice(0, Number(req.query.limit || 60)) });
+});
+
+app.get("/api/coaches", (req, res) => {
+  const sport = req.query.sport || "cricket";
+  res.json({
+    ok: true,
+    sport,
+    types: COACH_TYPES[sport] || COACH_TYPES.cricket,
+    coaches: COACHES[sport] || COACHES.cricket,
+  });
+});
+
+app.get("/api/official-teams", (req, res) => {
+  const sport = req.query.sport || "cricket";
+  const teams = getTeamsForSport(sport);
+  const rosters = OFFICIAL_ROSTERS[sport] || {};
+  res.json({ ok: true, sport, teams, rosters });
+});
+
+app.post("/api/match/simulate", (req, res) => {
+  const { sport = "cricket", teamA, teamB, mode = "custom" } = req.body || {};
+  if (!teamA || !teamB) return res.status(400).json({ ok: false, error: "teamA and teamB required" });
+
+  try {
+    let result;
+    if (sport === "football") result = simulateFootballMatch(teamA, teamB);
+    else if (sport === "kabaddi") result = simulateKabaddiMatch(teamA, teamB);
+    else result = simulateCricketMatch(teamA, teamB);
+
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 // ── Stats API ────────────────────────────────────────────────────────────────
@@ -50,7 +91,7 @@ app.get("/api/stats/player", async (req, res) => {
   const id  = String(req.query.id    || "").trim();
   const sport = String(req.query.sport || "cricket").trim();
   if (!name && id) {
-    const pool = sport === "football" ? FOOTBALL_PLAYERS : CRICKET_PLAYERS;
+    const pool = sport === "football" ? FOOTBALL_PLAYERS : sport === "kabaddi" ? KABADDI_PLAYERS : CRICKET_PLAYERS;
     const p = pool.find((x) => x.id === id);
     if (p) name = p.name;
     else return res.status(404).json({ ok: false, error: "Player not found" });

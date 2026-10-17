@@ -1,4 +1,4 @@
-import { TEAMS, TEAM_BY_ID, ALL_TEAMS } from "../../../shared/teams.js";
+import { TEAMS, TEAM_BY_ID, ALL_TEAMS, getTeamsForSport } from "../../../shared/teams.js";
 import {
   DEFAULT_SETTINGS, MODES, SPORTS, MAX_HUMAN_PLAYERS, MAX_ROOM_PLAYERS,
 } from "../../../shared/constants.js";
@@ -34,6 +34,7 @@ function teamShell(t) {
     id: t.id, short: t.short, name: t.name, city: t.city, glyph: t.glyph,
     primary: t.primary, secondary: t.secondary, accent: t.accent,
     ownerId: null, purseLeftL: 0, spentL: 0, squad: [], retentions: [], rtmLeft: 0,
+    coaches: {},
   };
 }
 
@@ -41,8 +42,10 @@ export function createRoom({ hostName, teamId, sport = "cricket", mode = "mock",
   const code = uniqueCode();
   const sportCfg = SPORTS[sport] ? sport : "cricket";
   const modeCfg = MODES[mode] ? mode : "mock";
+  const defaultBudget = sportCfg === "kabaddi" ? 5 : 120;
   const merged = {
     ...DEFAULT_SETTINGS,
+    budgetCr: defaultBudget,
     sport: sportCfg,
     mode: modeCfg,
     ...SPORTS[sportCfg].defaults,
@@ -51,7 +54,7 @@ export function createRoom({ hostName, teamId, sport = "cricket", mode = "mock",
   };
   merged.sport = sportCfg;
   merged.mode = modeCfg;
-  merged.budgetCr = clamp(Number(merged.budgetCr) || 120, 20, 500);
+  merged.budgetCr = clamp(Number(merged.budgetCr) || defaultBudget, 1, 500);
   merged.bidSeconds = clamp(Number(merged.bidSeconds) || 20, 4, 90);
   merged.resetSeconds = clamp(Number(merged.resetSeconds) || 10, 3, 60);
   merged.introSeconds = clamp(Number(merged.introSeconds ?? 3), 0, 15);
@@ -91,14 +94,19 @@ export function createRoom({ hostName, teamId, sport = "cricket", mode = "mock",
     botPlans: {},
     paused: false,
     pauseEndsAt: null,
+    coachesMap: new Map(),
+    coachQueue: [],
+    coachSets: [],
+    coachPhase: false,
   };
 
-  for (const t of TEAMS) room.teams[t.id] = teamShell(t);
+  const sportTeams = getTeamsForSport(sportCfg);
+  for (const t of sportTeams.slice(0, 10)) room.teams[t.id] = teamShell(t);
 
   const host = addParticipant(room, { name: hostName, teamId, isHost: true });
   room.hostId = host.id; // the room's host is the participant, not a separate id
   if (!host.teamId) {
-    const fallback = pickTeam(room, TEAMS[0].id) || TEAMS[0].id;
+    const fallback = pickTeam(room, sportTeams[0].id) || sportTeams[0].id;
     host.teamId = fallback;
     if (room.teams[fallback]) room.teams[fallback].ownerId = host.id;
   }
@@ -144,18 +152,23 @@ export function seatCapacity(room) {
 
 export function ensureTeam(room, teamId) {
   if (room.teams[teamId]) return room.teams[teamId];
-  const meta = ALL_TEAMS.find((t) => t.id === teamId);
+  const sportTeams = getTeamsForSport(room.sport);
+  const meta = sportTeams.find((t) => t.id === teamId) || ALL_TEAMS.find((t) => t.id === teamId);
   if (!meta) return null;
-  room.teams[teamId] = teamShell(meta);
+  const shell = teamShell(meta);
+  shell.purseLeftL = Math.round((room.settings?.budgetCr || 120) * 100);
+  shell.rtmLeft = Number(room.settings?.rtmCards) || 0;
+  room.teams[teamId] = shell;
   return room.teams[teamId];
 }
 
 export function pickTeam(room, teamId) {
   if (!seatCapacity(room)) return null;
   const taken = new Set(room.participants.filter((p) => !p.spectator && p.teamId).map((p) => p.teamId));
+  const sportTeams = getTeamsForSport(room.sport);
   const order = [
-    ...TEAMS.map((t) => t.id),
-    ...ALL_TEAMS.filter((t) => !TEAMS.some((x) => x.id === t.id)).map((t) => t.id),
+    ...sportTeams.map((t) => t.id),
+    ...ALL_TEAMS.filter((t) => !sportTeams.some((x) => x.id === t.id)).map((t) => t.id),
   ];
   if (teamId && !taken.has(teamId)) {
     const made = ensureTeam(room, teamId);
