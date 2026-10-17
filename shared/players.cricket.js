@@ -5,6 +5,7 @@
 const R = [
   // ── Marquee Indian batters & all-rounders ────────────────────────────────
   ["Virat Kohli", "IN", "BAT", 200, 95, "Right-hand bat • Top order anchor"],
+  ["MS Dhoni", "IN", "WK", 200, 96, "Right-hand bat • Iconic finisher, wicket-keeper & captain cool"],
   ["Rohit Sharma", "IN", "BAT", 200, 93, "Right-hand bat • Explosive opener"],
   ["Suryakumar Yadav", "IN", "BAT", 200, 94, "Right-hand bat • 360° stroke-maker"],
   ["Shubman Gill", "IN", "BAT", 200, 92, "Right-hand bat • Elegant top order"],
@@ -19,6 +20,33 @@ const R = [
   ["Mohammed Shami", "IN", "PACE", 200, 88, "Right-arm fast • Seam merchant"],
   ["Kuldeep Yadav", "IN", "SPIN", 200, 89, "Left-arm wrist spin • Wicket-taker"],
   ["Yuzvendra Chahal", "IN", "SPIN", 200, 87, "Leg-break • Middle-overs strangler"],
+
+  // ── All-Time Legends ──────────────────────────────────────────────────────
+  ["Sachin Tendulkar", "IN", "BAT", 200, 99, "Right-hand bat • Master Blaster & Cricket God", true],
+  ["Kapil Dev", "IN", "AR", 200, 97, "Right-hand bat • Right-arm fast-outswing legend", true],
+  ["Rahul Dravid", "IN", "BAT", 200, 95, "Right-hand bat • The Wall of Cricket", true],
+  ["Sourav Ganguly", "IN", "BAT", 200, 94, "Left-hand bat • Dada • God of offside", true],
+  ["Virender Sehwag", "IN", "BAT", 200, 96, "Right-hand bat • Fearless destructive opener", true],
+  ["Yuvraj Singh", "IN", "AR", 200, 96, "Left-hand bat • Slow left-arm • 6-sixes champion", true],
+  ["Anil Kumble", "IN", "SPIN", 200, 96, "Right-arm leg spin • Jumbo • 10-wicket hero", true],
+  ["Wasim Akram", "PAK", "PACE", 200, 98, "Left-arm fast • Sultan of Swing", true],
+  ["Shane Warne", "AU", "SPIN", 200, 98, "Right-arm leg spin • Spin wizard", true],
+  ["Brian Lara", "WI", "BAT", 200, 98, "Left-hand bat • Prince of Trinidad", true],
+  ["Ricky Ponting", "AU", "BAT", 200, 97, "Right-hand bat • Pull-shot master & champion captain", true],
+  ["Jacques Kallis", "SA", "AR", 200, 98, "Right-hand bat • Right-arm fast-medium all-rounder", true],
+  ["Vivian Richards", "WI", "BAT", 200, 98, "Right-hand bat • Swagger & fearless domination", true],
+  ["Glenn McGrath", "AU", "PACE", 200, 97, "Right-arm fast-medium • Metronomic accuracy", true],
+  ["Muttiah Muralitharan", "SL", "SPIN", 200, 98, "Right-arm off break • Record wicket-taker", true],
+  ["Lasith Malinga", "SL", "PACE", 200, 96, "Right-arm fast • Slinging toe-crushers", true],
+  ["AB de Villiers", "SA", "BAT", 200, 97, "Right-hand bat • Mr. 360 innovation", true],
+  ["Chris Gayle", "WI", "BAT", 200, 95, "Left-hand bat • Universe Boss • T20 icon", true],
+  ["Dale Steyn", "SA", "PACE", 200, 95, "Right-arm fast • Steyn Gun lethal outswing", true],
+  ["Zaheer Khan", "IN", "PACE", 200, 94, "Left-arm fast-medium • Knuckleball & reverse swing", true],
+  ["Harbhajan Singh", "IN", "SPIN", 200, 92, "Right-arm off break • The Turbanator doosra", true],
+  ["Gautam Gambhir", "IN", "BAT", 200, 93, "Left-hand bat • Clutch finals fighter", true],
+  ["Suresh Raina", "IN", "BAT", 200, 92, "Left-hand bat • Mr. IPL middle-order gun", true],
+  ["Adam Gilchrist", "AU", "WK", 200, 95, "Left-hand bat • Revolutionized keeper-batters", true],
+  ["Brett Lee", "AU", "PACE", 200, 94, "Right-arm fast • Express lightning pace", true],
 
   // ── Indian batters ───────────────────────────────────────────────────────
   ["Shreyas Iyer", "IN", "BAT", 200, 89, "Right-hand bat • Middle-order builder"],
@@ -531,9 +559,11 @@ for (const row of R) {
 }
 
 export const CRICKET_PLAYERS = clean.map((row, i) => {
-  const [name, country, role, base, rating, style] = row;
+  const [name, country, role, _rawBase, rating, style, isLegend] = row;
   const overseas = country !== "IN";
-  const tier = rating >= 90 ? "MARQUEE" : rating >= 84 ? "ELITE" : rating >= 76 ? "CORE" : rating >= 69 ? "SUPPORT" : "EMERGING";
+  const tier = isLegend ? "LEGENDS" : rating >= 90 ? "MARQUEE" : rating >= 84 ? "ELITE" : rating >= 76 ? "CORE" : rating >= 69 ? "SUPPORT" : "EMERGING";
+  // Strict uniform base price by set tier (all players in a set have the exact same price)
+  const base = tier === "LEGENDS" || tier === "MARQUEE" ? 200 : tier === "ELITE" ? 150 : tier === "CORE" ? 100 : tier === "SUPPORT" ? 50 : 30;
   return {
     id: `c${i + 1}`,
     name,
@@ -543,8 +573,9 @@ export const CRICKET_PLAYERS = clean.map((row, i) => {
     rating,
     style,
     overseas,
+    isLegend: !!isLegend,
     tier,
-    setKey: `${overseas ? "OS" : "IN"}-${role}-${tier}`,
+    setKey: `${isLegend ? "LEGEND" : overseas ? "OS" : "IN"}-${role}-${tier}`,
   };
 });
 

@@ -14,6 +14,7 @@ import { HouseRulesModal } from "./Lobby.jsx";
 import ScoutingModal, { ShortcutsModal, estValue } from "../components/Scouting.jsx";
 import { getWatchlist, toggleWatch, SHORTCUTS } from "../lib/watchlist.js";
 import { PlayerStatsBadge, PlayerStatsCard } from "../components/PlayerStats.jsx";
+import { COACHES, COACH_TYPES } from "../../../shared/coaches.js";
 
 export default function Auction({ onLeave }) {
   const store = useStore();
@@ -299,7 +300,7 @@ export default function Auction({ onLeave }) {
         {/* ── RIGHT RAIL ──────────────────────────────────────────────── */}
         <div className="hidden flex-col gap-3 lg:flex">
           <div className="panel flex overflow-hidden">
-            {[["table", "Table"], ["squad", "My squad"], ["feed", "Feed"], ["book", "Ledger"]].map(([id, label]) => (
+            {[["table", "Table"], ["squad", "My squad"], ["coaches", "Coaches"], ["feed", "Feed"], ["book", "Ledger"]].map(([id, label]) => (
               <button key={id} onClick={() => setTab(id)}
                 className={clsx("flex-1 py-2.5 text-[11px] font-bold uppercase tracking-wider transition",
                   tab === id ? "bg-white/8 text-gold-300" : "text-slate-400 hover:bg-white/4 hover:text-slate-200")}>
@@ -312,6 +313,7 @@ export default function Auction({ onLeave }) {
               <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .16 }}>
                 {tab === "table" && <TablePanel mergedTeams={mergedTeams} payload={payload} live={live} current={current} playersById={playersById} settings={settings} me={me} />}
                 {tab === "squad" && <SquadPanel myTeam={myTeam} playersById={playersById} settings={settings} sport={payload.sport} report={squadReport} />}
+                {tab === "coaches" && <CoachesPanel myTeam={myTeam} sport={payload.sport} />}
                 {tab === "feed" && <FeedPanel payload={payload} chat={chat} chatText={chatText} setChatText={setChatText} act={act} feedTab={feedTab} setFeedTab={setFeedTab} />}
                 {tab === "book" && <LedgerPanel soldList={soldList} unsoldIds={unsoldIds} playersById={playersById} mergedTeams={mergedTeams} />}
               </motion.div>
@@ -328,6 +330,7 @@ export default function Auction({ onLeave }) {
               <div className="h-full overflow-y-auto scroll-thin p-3">
                 {mobileTab === "table" && <TablePanel mergedTeams={mergedTeams} payload={payload} live={live} current={current} playersById={playersById} settings={settings} me={me} />}
                 {mobileTab === "squad" && <SquadPanel myTeam={myTeam} playersById={playersById} settings={settings} sport={payload.sport} report={squadReport} />}
+                {mobileTab === "coaches" && <CoachesPanel myTeam={myTeam} sport={payload.sport} />}
                 {mobileTab === "feed" && <FeedPanel payload={payload} chat={chat} chatText={chatText} setChatText={setChatText} act={act} feedTab={feedTab} setFeedTab={setFeedTab} />}
                 {mobileTab === "book" && <LedgerPanel soldList={soldList} unsoldIds={unsoldIds} playersById={playersById} mergedTeams={mergedTeams} />}
               </div>
@@ -342,8 +345,8 @@ export default function Auction({ onLeave }) {
         ) : (
           <div className="px-4 py-3 text-center text-xs font-semibold text-slate-400">👀 Spectator seat — enjoy the show</div>
         )}
-        <div className="grid grid-cols-5 border-t border-white/8">
-          {[["bid", "🔨", "Bid"], ["table", "🏟", "Table"], ["squad", "📋", "Squad"], ["feed", "💬", "Feed"], ["book", "📒", "Ledger"]].map(([id, icon, label]) => (
+        <div className="grid grid-cols-6 border-t border-white/8">
+          {[["bid", "🔨", "Bid"], ["table", "🏟", "Table"], ["squad", "📋", "Squad"], ["coaches", "👔", "Coach"], ["feed", "💬", "Feed"], ["book", "📒", "Ledger"]].map(([id, icon, label]) => (
             <button key={id} onClick={() => setMobileTab((t) => (t === id ? "bid" : id))}
               className={clsx("flex flex-col items-center gap-0.5 py-2 text-[10px] font-bold transition",
                 mobileTab === id ? "text-gold-300" : "text-slate-500")}>
@@ -902,6 +905,89 @@ function LedgerPanel({ soldList, unsoldIds, playersById, mergedTeams }) {
               </div>
             );
           }))}
+      </div>
+    </Panel>
+  );
+}
+
+function CoachesPanel({ myTeam, sport = "cricket" }) {
+  const types = COACH_TYPES[sport] || COACH_TYPES.cricket;
+  const allCoaches = COACHES[sport] || COACHES.cricket;
+  const [assigned, setAssigned] = useState(myTeam?.coaches || {});
+  const [selectingType, setSelectingType] = useState(null);
+
+  const onSelectCoach = (type, coach) => {
+    const updated = { ...assigned, [type]: coach };
+    setAssigned(updated);
+    if (myTeam) myTeam.coaches = updated;
+    setSelectingType(null);
+    sfx.click();
+  };
+
+  return (
+    <Panel className="p-3.5 space-y-3">
+      <div className="flex items-center justify-between border-b border-white/8 pb-2.5">
+        <div>
+          <h3 className="font-display text-base font-bold text-white">👔 Coaching Staff</h3>
+          <p className="text-[10.5px] text-slate-400">4 specialist mentors directing franchise tactics</p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {types.map((t) => {
+          const current = assigned[t.type];
+          return (
+            <div key={t.type} className="rounded-xl border border-white/8 bg-white/4 p-2.5 transition">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-300">
+                  <span className="mr-1">{t.icon}</span>{t.title}
+                </span>
+                <button
+                  onClick={() => setSelectingType(selectingType === t.type ? null : t.type)}
+                  className="rounded bg-white/10 px-2 py-0.5 text-[9.5px] font-bold text-gold-300 hover:bg-white/20"
+                >
+                  {current ? "Change" : "+ Hire Coach"}
+                </button>
+              </div>
+
+              {current ? (
+                <div className="mt-1.5 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="font-bold text-white text-[11px]">{current.name}</span>
+                    <span className="ml-1.5 text-[9.5px] text-gold-400 font-mono">★ {current.rating}</span>
+                    <p className="text-[9.5px] text-slate-400 mt-0.5 line-clamp-1">{current.specialty}</p>
+                  </div>
+                  <span className="chip !py-0 !text-[8.5px] border-turf-500/40 text-turf-300">Active</span>
+                </div>
+              ) : (
+                <p className="mt-1 text-[10px] text-slate-500 italic">Slot open</p>
+              )}
+
+              {selectingType === t.type && (
+                <div className="mt-2.5 border-t border-white/8 pt-2 space-y-1 max-h-40 overflow-y-auto pr-1">
+                  {allCoaches
+                    .filter((c) => c.type === t.type)
+                    .map((coach) => (
+                      <div
+                        key={coach.id}
+                        onClick={() => onSelectCoach(t.type, coach)}
+                        className="cursor-pointer rounded-lg p-1.5 transition bg-white/5 hover:bg-white/10 flex items-center justify-between text-xs"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <span className="font-semibold text-white text-[11px]">{coach.name}</span>
+                          <span className="ml-1.5 text-[9.5px] text-gold-400 font-mono">★ {coach.rating}</span>
+                          <p className="text-[9.5px] text-slate-400 truncate">{coach.specialty}</p>
+                        </div>
+                        <button className="rounded bg-gold-500/20 px-2 py-0.5 text-[9.5px] font-bold text-gold-300 shrink-0">
+                          Sign
+                        </button>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Panel>
   );

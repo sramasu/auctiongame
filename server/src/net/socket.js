@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import {
   rooms, createRoom, addParticipant, removeParticipant, findParticipant,
   participantPayload, liveState, listPublicRooms, getRoom, humanCount, makeToken, pickTeam, fillBots,
+  seatCapacity,
 } from "../game/room.js";
 import {
   prepareAuction, startAuction, tickRoom, placeBid, passOnPlayer, setAutoBid,
@@ -191,6 +192,24 @@ export function attachSockets(httpServer) {
           participants: room.participants.map(x => ({ id: x.id, name: x.name, teamId: x.teamId, isHost: x.isHost, isBot: x.isBot, spectator: x.spectator, connected: x.connected }))
         });
         return ack(cb, { ok: true, code: room.code, participantId: botSlot.id, token: botSlot.token, tookOver: botSlot.teamId, payload: participantPayload(room) });
+      }
+
+      // Try to take a free franchise seat if capacity allows and not spectator
+      if (!payload.spectator && seatCapacity(room)) {
+        const freeTeam = pickTeam(room, payload.teamId);
+        if (freeTeam) {
+          const p = addParticipant(room, { name, teamId: freeTeam });
+          socket.data.room = room.code;
+          socket.data.participantId = p.id;
+          socket.data.token = p.token;
+          socket.join(room.code);
+          touch(room);
+          pushFeed(room, "system", `${name} joined live and took ${room.teams[freeTeam]?.name || "a franchise"}.`, { teamId: freeTeam });
+          io.to(room.code).emit("participants", {
+            participants: room.participants.map(x => ({ id: x.id, name: x.name, teamId: x.teamId, isHost: x.isHost, isBot: x.isBot, spectator: x.spectator, connected: x.connected }))
+          });
+          return ack(cb, { ok: true, code: room.code, participantId: p.id, token: p.token, tookOver: freeTeam, payload: participantPayload(room) });
+        }
       }
 
       // No bot slot or explicitly wants spectator

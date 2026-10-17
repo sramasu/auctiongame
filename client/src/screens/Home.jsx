@@ -1,22 +1,24 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import clsx from "clsx";
-import { TEAMS } from "../../../shared/teams.js";
+import { TEAMS, getTeamsForSport } from "../../../shared/teams.js";
 import { MODES, SPORTS, DEFAULT_SETTINGS } from "../../../shared/constants.js";
 import { CRICKET_POOL_SIZE } from "../../../shared/players.cricket.js";
 import { FOOTBALL_POOL_SIZE } from "../../../shared/players.football.js";
+import { KABADDI_POOL_SIZE } from "../../../shared/players.kabaddi.js";
 import { useStore } from "../store.jsx";
 import { Panel, Modal, Slider, Toggle, TeamBadge, StatTile, Spinner, Money } from "../components/ui.jsx";
 import { sfx, unlockAudio } from "../lib/sound.js";
 
 const MODE_ORDER = ["mock", "mega", "blitz", "custom"];
 
-export default function Home() {
+export default function Home({ onOpenMatch }) {
   const { createRoom, joinRoom, refreshRooms, rooms, prefs, setPrefs, notify, conn, session, rejoin } = useStore();
   const [name, setName] = useState(prefs.lastName || "");
   const [sport, setSport] = useState(prefs.lastSport || "cricket");
   const [mode, setMode] = useState(prefs.lastMode || "mock");
-  const [teamId, setTeamId] = useState(TEAMS[0].id);
+  const currentTeams = useMemo(() => getTeamsForSport(sport), [sport]);
+  const [teamId, setTeamId] = useState(currentTeams[0]?.id || TEAMS[0].id);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(null);
   const [browseOpen, setBrowseOpen] = useState(false);
@@ -25,19 +27,26 @@ export default function Home() {
   const [joinAsSpectator, setJoinAsSpectator] = useState(false);
 
   useEffect(() => {
+    const list = getTeamsForSport(sport);
+    if (list.length > 0 && !list.some((t) => t.id === teamId)) {
+      setTeamId(list[0].id);
+    }
+  }, [sport]);
+
+  useEffect(() => {
     const base = { ...DEFAULT_SETTINGS, ...(MODES[mode] || {}), ...(SPORTS[sport]?.defaults || {}) };
     base.sport = sport;
     base.mode = mode;
     base.retentions = mode === "mock" && sport === "cricket";
     base.rtmCards = MODES[mode]?.rtmCards ?? 0;
     base.poolTop = MODES[mode]?.poolTop ?? 0;
-    base.budgetCr = MODES[mode]?.budgetCr ?? 120;
+    base.budgetCr = sport === "kabaddi" ? 5 : (MODES[mode]?.budgetCr ?? 120);
     if (mode === "custom") { base.retentions = false; base.poolTop = 0; }
     if (sport === "football") { base.maxOverseas = null; base.overseasInXI = null; }
     setSettings((prev) => ({ ...prev, ...base }));
   }, [sport, mode]);
 
-  const poolSize = sport === "football" ? FOOTBALL_POOL_SIZE : CRICKET_POOL_SIZE;
+  const poolSize = sport === "football" ? FOOTBALL_POOL_SIZE : sport === "kabaddi" ? KABADDI_POOL_SIZE : CRICKET_POOL_SIZE;
   const effectivePool = settings.poolTop > 0 ? Math.min(settings.poolTop, poolSize) : poolSize;
 
   const guardName = () => {
@@ -142,6 +151,12 @@ export default function Home() {
               <button className="btn-ghost px-5 py-3.5 text-base" onClick={onSolo} disabled={busy === "solo"}>
                 {busy === "solo" ? <Spinner label="Seating AI owners" /> : <>🤖 Play solo vs AI</>}
               </button>
+              <button
+                className="rounded-2xl border border-turf-500/50 bg-turf-500/20 px-5 py-3.5 text-base font-bold text-turf-200 transition hover:bg-turf-500/30 shadow-lg"
+                onClick={() => onOpenMatch && onOpenMatch(sport)}
+              >
+                🏟️ Play Match vs AI (Instant)
+              </button>
               <button className="btn-ghost px-5 py-3.5 text-base" onClick={openBrowse}>
                 👀 Browse live rooms {rooms.length > 0 && <span className="ml-1 rounded-full bg-turf-500/20 px-2 py-0.5 text-[11px] text-turf-300">{rooms.length}</span>}
               </button>
@@ -164,12 +179,12 @@ export default function Home() {
 
                 <div>
                   <label className="label">Sport</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {Object.values(SPORTS).map((sp) => (
                       <button key={sp.id} onClick={() => { setSport(sp.id); sfx.click(); }}
-                        className={clsx("rounded-xl border px-3 py-2.5 text-sm font-bold transition",
-                          sport === sp.id ? "border-gold-400/60 bg-gold-500/12 text-gold-200" : "border-white/10 bg-white/4 text-slate-300 hover:bg-white/8")}>
-                        <span className="mr-1.5">{sp.icon}</span>{sp.label}
+                        className={clsx("rounded-xl border px-3 py-2.5 text-xs sm:text-sm font-bold transition",
+                          sport === sp.id ? "border-gold-400/60 bg-gold-500/12 text-gold-200 shadow-md" : "border-white/10 bg-white/4 text-slate-300 hover:bg-white/8")}>
+                        <span className="mr-1">{sp.icon}</span>{sp.label}
                       </button>
                     ))}
                   </div>
@@ -177,8 +192,8 @@ export default function Home() {
 
                 <div>
                   <label className="label">Your franchise</label>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {TEAMS.map((t) => (
+                  <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-6">
+                    {currentTeams.map((t) => (
                       <button key={t.id} onClick={() => { setTeamId(t.id); sfx.hover(); }} title={t.name}
                         className={clsx("group relative aspect-square rounded-xl transition", teamId === t.id && "ring-2 ring-gold-400 ring-offset-2 ring-offset-night-900")}>
                         <TeamBadge team={t} full className="rounded-xl" />
@@ -189,7 +204,7 @@ export default function Home() {
                     ))}
                   </div>
                   <p className="mt-1.5 text-[11px] text-slate-500">
-                    Picked: <span className="font-semibold text-slate-300">{TEAMS.find((t) => t.id === teamId)?.name}</span> — anyone can take a different seat later.
+                    Picked: <span className="font-semibold text-slate-300">{currentTeams.find((t) => t.id === teamId)?.name}</span> — anyone can take a different seat later.
                   </p>
                 </div>
 

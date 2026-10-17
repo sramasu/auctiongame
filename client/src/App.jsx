@@ -7,6 +7,8 @@ import Lobby from "./screens/Lobby.jsx";
 import Auction from "./screens/Auction.jsx";
 import Results from "./screens/Results.jsx";
 
+import Match from "./screens/Match.jsx";
+
 function Backdrop() {
   return (
     <>
@@ -20,19 +22,26 @@ function Backdrop() {
 function Shell() {
   const { payload, live, status, leaveRoom, act, notify, conn, restoring, session } = useStore();
   const [screen, setScreen] = useState("home");
+  const [matchData, setMatchData] = useState(null);
 
   const effectiveStatus = live?.status || payload?.status;
 
   useEffect(() => {
+    if (screen === "match") return;
     if (!payload) setScreen("home");
     else if (effectiveStatus === "done" || payload.results) setScreen("results");
     else if (effectiveStatus === "live") setScreen("auction");
     else setScreen("lobby");
-  }, [payload, effectiveStatus]);
+  }, [payload, effectiveStatus, screen]);
 
   const leave = async () => {
     await leaveRoom();
     setScreen("home");
+  };
+
+  const openMatch = (data = {}) => {
+    setMatchData(data);
+    setScreen("match");
   };
 
   return (
@@ -61,15 +70,26 @@ function Shell() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: .22 }}
         >
-          {screen === "home" && <Home />}
+          {screen === "home" && <Home onOpenMatch={(sp) => openMatch({ sport: sp || "cricket" })} />}
           {screen === "lobby" && <Lobby onLeave={leave} />}
           {screen === "auction" && <Auction onLeave={leave} />}
           {screen === "results" && (
             <Results
               onLeave={leave}
+              onPlayMatch={(team, sp) => openMatch({ draftedTeam: team, sport: sp, fromResults: true })}
               onRematch={async () => {
                 const res = await act("auction:start");
                 if (!res?.ok) notify(res?.error || "Could not restart", "error");
+              }}
+            />
+          )}
+          {screen === "match" && (
+            <Match
+              draftedTeam={matchData?.draftedTeam}
+              initialSport={matchData?.sport || "cricket"}
+              onBack={() => {
+                if (matchData?.fromResults) setScreen("results");
+                else setScreen("home");
               }}
             />
           )}

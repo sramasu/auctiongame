@@ -1,18 +1,25 @@
 import { CRICKET_PLAYERS } from "../../../shared/players.cricket.js";
 import { FOOTBALL_PLAYERS } from "../../../shared/players.football.js";
+import { KABADDI_PLAYERS } from "../../../shared/players.kabaddi.js";
+import { COACHES, COACH_TYPES } from "../../../shared/coaches.js";
 import { RETENTIONS, TOTAL_PURSE_CR } from "../../../shared/retentions.js";
 import {
   MODES, TIER_ORDER, ROLE_SET_ORDER, ROLE_SET_NAME, SPORTS,
 } from "../../../shared/constants.js";
 import { shuffle } from "../../../shared/format.js";
 
-const POOLS = { cricket: CRICKET_PLAYERS, football: FOOTBALL_PLAYERS };
+const POOLS = {
+  cricket: CRICKET_PLAYERS,
+  football: FOOTBALL_PLAYERS,
+  kabaddi: KABADDI_PLAYERS,
+};
 
 export function getPool(sport) {
   return POOLS[sport] || CRICKET_PLAYERS;
 }
 
 const TIER_PREFIX = {
+  LEGENDS: "All-Time Legends",
   MARQUEE: "Marquee",
   ELITE: "Elite",
   CORE: "Established",
@@ -31,14 +38,17 @@ export function buildAuctionList({ sport, mode, poolTop = 0, seed = Math.random 
 
   if (poolTop > 0 || (modeCfg.poolTop || 0) > 0) {
     const n = poolTop || modeCfg.poolTop;
-    // Keep a spread across roles/tiers rather than a pure rating cut.
     const sorted = all.slice().sort((a, b) => b.rating - a.rating);
-    const top = new Set(sorted.slice(0, n).map((p) => p.id));
+    const top = new Set();
     const roleOrder = ROLE_SET_ORDER[sport] || [];
-    const perRole = Math.ceil(n / Math.max(1, roleOrder.length));
+    const perRole = Math.max(1, Math.floor(n / Math.max(1, roleOrder.length)));
     for (const role of roleOrder) {
       const inRole = sorted.filter((p) => p.role === role);
       inRole.slice(0, perRole).forEach((p) => top.add(p.id));
+    }
+    for (const p of sorted) {
+      if (top.size >= n) break;
+      top.add(p.id);
     }
     list = all.filter((p) => top.has(p.id));
   }
@@ -64,10 +74,16 @@ export function buildAuctionList({ sport, mode, poolTop = 0, seed = Math.random 
   const queue = [];
   keys.forEach((key, idx) => {
     const [tier, role, dom] = key.split("|");
-    const members = groups.get(key).sort((a, b) => b.rating - a.rating);
+    const rawMembers = groups.get(key);
+    // Base price is uniform across all players in this set
+    const setBasePrice = rawMembers[0]?.base || 100;
+    const uniformMembers = rawMembers.map((p) => ({ ...p, base: setBasePrice }));
+    // Shuffle members so players appear in randomized order within the set
+    const members = shuffle(uniformMembers, seed);
+
     const overseas = dom === "os";
     const prefix = TIER_PREFIX[tier] || tier;
-    const geo = sport === "football" ? "" : overseas ? " Overseas" : " Indian";
+    const geo = (sport === "football" || sport === "kabaddi") ? "" : overseas ? " Overseas" : " Indian";
     const name = `${prefix}${geo} ${ROLE_SET_NAME[role] || role}`;
     const ids = members.map((p) => p.id);
     sets.push({ id: `set-${idx + 1}`, index: idx + 1, name, tier, role, overseas, ids });
@@ -76,6 +92,35 @@ export function buildAuctionList({ sport, mode, poolTop = 0, seed = Math.random 
 
   const players = new Map(list.map((p) => [p.id, p]));
   return { players, queue, sets, list };
+}
+
+/**
+ * Build the Coach auction list: 4 distinct coaching categories.
+ * Returns { coaches: Map<id,coach>, queue: [ids], sets: [{id, name, ids}] }
+ */
+export function buildCoachAuctionList({ sport = "cricket", seed = Math.random }) {
+  const sportCoaches = COACHES[sport] || COACHES.cricket;
+  const types = COACH_TYPES[sport] || COACH_TYPES.cricket;
+  const sets = [];
+  const queue = [];
+  const coachesMap = new Map();
+
+  types.forEach((typeObj, idx) => {
+    const inType = sportCoaches.filter((c) => c.type === typeObj.type);
+    const shuffled = shuffle(inType, seed);
+    const ids = shuffled.map((c) => c.id);
+    shuffled.forEach((c) => coachesMap.set(c.id, c));
+    sets.push({
+      id: `coach-set-${idx + 1}`,
+      index: idx + 1,
+      name: `${typeObj.icon} ${typeObj.title}`,
+      type: typeObj.type,
+      ids,
+    });
+    queue.push(...ids);
+  });
+
+  return { coaches: coachesMap, queue, sets, list: sportCoaches };
 }
 
 /**

@@ -8,7 +8,7 @@ import { ROLE_LABEL, COUNTRY_FLAG } from "../../../shared/teams.js";
 import { MODES } from "../../../shared/constants.js";
 import { sfx } from "../lib/sound.js";
 
-export default function Results({ onLeave, onRematch }) {
+export default function Results({ onLeave, onRematch, onPlayMatch }) {
   const { payload, live, me, isHost, notify } = useStore();
   const results = payload?.results || live?.results?.full || null;
   const [expanded, setExpanded] = useState(null);
@@ -70,6 +70,12 @@ export default function Results({ onLeave, onRematch }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              className="btn-gold !px-4 !py-2 text-xs font-bold shadow-md hover:scale-105 transition"
+              onClick={() => onPlayMatch && onPlayMatch(mine || standings[0], payload?.sport)}
+            >
+              🏟️ Play Match with Squad
+            </button>
             <button className="btn-ghost !px-3 !py-2 text-xs" onClick={copySummary}>📋 Copy report</button>
             <button className="btn-ghost !px-3 !py-2 text-xs" onClick={() => download("csv")}>⬇ Signings CSV</button>
             <button className="btn-ghost !px-3 !py-2 text-xs" onClick={() => download("json")}>⬇ JSON</button>

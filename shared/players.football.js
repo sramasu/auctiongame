@@ -2,6 +2,28 @@
 // Row format: [name, country, position, basePriceLakhs, rating, style]
 
 const R = [
+  // ── All-Time Football Legends ──────────────────────────────────────────
+  ["Zinedine Zidane", "FRA", "MID", 200, 98, "Both feet • Elegance, pirouettes & volley perfection", true],
+  ["Ronaldinho", "BRA", "FWD", 200, 97, "Right foot • Samba magic, elastico & smiling genius", true],
+  ["Thierry Henry", "FRA", "FWD", 200, 96, "Right foot • Va-va-voom pace, curled finishes", true],
+  ["Paolo Maldini", "ITA", "DEF", 200, 98, "Left foot • Defending deity, timeless positioning", true],
+  ["Gianluigi Buffon", "ITA", "GK", 200, 97, "Right foot • Commander of the penalty box", true],
+  ["Andrés Iniesta", "ESP", "MID", 200, 97, "Right foot • La Croqueta, world cup winner", true],
+  ["Xavi Hernández", "ESP", "MID", 200, 96, "Right foot • Tiki-taka conductor", true],
+  ["Ronaldo Nazário", "BRA", "FWD", 200, 98, "Both feet • Il Fenomeno • Step-over speed", true],
+  ["Johan Cruyff", "NED", "FWD", 200, 98, "Both feet • Total football visionary", true],
+  ["Diego Maradona", "ARG", "FWD", 200, 99, "Left foot • Dribbling god & match winner", true],
+  ["Pelé", "BRA", "FWD", 200, 99, "Both feet • King of football, 3 World Cups", true],
+  ["Kaká", "BRA", "MID", 200, 95, "Right foot • Gliding runs, Ballon d'Or winner", true],
+  ["Roberto Carlos", "BRA", "DEF", 200, 94, "Left foot • Banana free-kicks & explosive overlap", true],
+  ["Sergio Ramos", "ESP", "DEF", 200, 94, "Right foot • 93rd-minute header clutch & warrior", true],
+  ["Carles Puyol", "ESP", "DEF", 200, 93, "Right foot • Heart of Catalonia & slide tackles", true],
+  ["Iker Casillas", "ESP", "GK", 200, 95, "Left foot • Saint Iker • World cup winning captain", true],
+  ["Andrea Pirlo", "ITA", "MID", 200, 94, "Right foot • No party without Pirlo • Panenka free-kicks", true],
+  ["Wayne Rooney", "ENG", "FWD", 200, 93, "Right foot • Overhead kicks, tenacity & all-time scorer", true],
+  ["Dennis Bergkamp", "NED", "FWD", 200, 94, "Right foot • Non-flying Dutchman, impossible first touch", true],
+  ["Steven Gerrard", "ENG", "MID", 200, 93, "Right foot • Istanbul hero • Long-range screamer", true],
+
   // ── Global marquee ───────────────────────────────────────────────────────
   ["Kylian Mbappé", "FRA", "FWD", 200, 96, "Left foot • Blistering pace, clinical finisher"],
   ["Erling Haaland", "NOR", "FWD", 200, 95, "Left foot • Pure number nine"],
@@ -596,8 +618,10 @@ for (const row of R) {
 }
 
 export const FOOTBALL_PLAYERS = clean.map((row, i) => {
-  const [name, country, role, base, rating, style] = row;
-  const tier = rating >= 90 ? "MARQUEE" : rating >= 84 ? "ELITE" : rating >= 78 ? "CORE" : rating >= 73 ? "SUPPORT" : "EMERGING";
+  const [name, country, role, _rawBase, rating, style, isLegend] = row;
+  const tier = isLegend ? "LEGENDS" : rating >= 90 ? "MARQUEE" : rating >= 84 ? "ELITE" : rating >= 78 ? "CORE" : rating >= 73 ? "SUPPORT" : "EMERGING";
+  // Strict uniform base price by set tier (all players in a set have the exact same price)
+  const base = tier === "LEGENDS" || tier === "MARQUEE" ? 200 : tier === "ELITE" ? 150 : tier === "CORE" ? 100 : tier === "SUPPORT" ? 50 : 30;
   return {
     id: `f${i + 1}`,
     name,
@@ -607,8 +631,9 @@ export const FOOTBALL_PLAYERS = clean.map((row, i) => {
     rating,
     style,
     overseas: true,
+    isLegend: !!isLegend,
     tier,
-    setKey: `FT-${role}-${tier}`,
+    setKey: `${isLegend ? "LEGEND" : "FT"}-${role}-${tier}`,
   };
 });
 
