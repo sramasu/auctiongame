@@ -13,10 +13,11 @@ import { ROLE_LABEL, COUNTRY_FLAG } from "../../../shared/teams.js";
 import { HouseRulesModal } from "./Lobby.jsx";
 import ScoutingModal, { ShortcutsModal, estValue } from "../components/Scouting.jsx";
 import { getWatchlist, toggleWatch, SHORTCUTS } from "../lib/watchlist.js";
+import { PlayerStatsBadge, PlayerStatsCard } from "../components/PlayerStats.jsx";
 
 export default function Auction({ onLeave }) {
   const store = useStore();
-  const { payload, live, me, isHost, act, notify, mergedTeams, playersById, current, currentPlayer, prefs, setPrefs } = store;
+  const { payload, live, me, isHost, act, notify, mergedTeams, playersById, current, currentPlayer, prefs, setPrefs, stats } = store;
   const [tab, setTab] = useState("table");
   const [mobileTab, setMobileTab] = useState("bid");
   const [reactOpen, setReactOpen] = useState(false);
@@ -246,7 +247,7 @@ export default function Auction({ onLeave }) {
             timerTotal={timerTotal} phase={phase} settings={settings} playersById={playersById}
             myTeam={myTeam} isSpectator={isSpectator} payload={payload} live={live}
             mergedTeams={mergedTeams} onRtm={doRtm}
-            watch={watch} onToggleWatch={onToggleWatch}
+            watch={watch} onToggleWatch={onToggleWatch} stats={stats}
           />
 
           {/* BID CONSOLE (desktop) */}
@@ -391,7 +392,7 @@ export default function Auction({ onLeave }) {
 // ────────────────────────────────────────────────────────────────────────────
 // Player stage
 // ────────────────────────────────────────────────────────────────────────────
-function PlayerStage({ player, current, leaderTeam, leftMs, timerTotal, phase, settings, playersById, myTeam, isSpectator, payload, live, mergedTeams, onRtm, watch = [], onToggleWatch }) {
+function PlayerStage({ player, current, leaderTeam, leftMs, timerTotal, phase, settings, playersById, myTeam, isSpectator, payload, live, mergedTeams, onRtm, watch = [], onToggleWatch, stats }) {
   const [detailOpen, setDetailOpen] = useState(false);
   if (!player) {
     return (
@@ -441,6 +442,7 @@ function PlayerStage({ player, current, leaderTeam, leftMs, timerTotal, phase, s
             <div className="flex flex-wrap items-center gap-2">
               <RolePill role={player.role} />
               <span className="chip !py-0.5 !text-[10px]">{COUNTRY_FLAG[player.country] || "🏳"} {player.overseas ? player.country : "India"}</span>
+              <PlayerStatsBadge stats={stats?.[player.id]} />
               {current?.setName && <span className="chip !py-0.5 !text-[10px] border-gold-500/25 text-gold-300/90">{current.setName}</span>}
               <button className="chip !py-0.5 !text-[10px] hover:border-white/25 hover:text-white" onClick={() => setDetailOpen(true)}>📈 full card</button>
               <button
@@ -537,13 +539,13 @@ function PlayerStage({ player, current, leaderTeam, leftMs, timerTotal, phase, s
       </motion.div>
 
       <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title={player.name}>
-        <PlayerDetail player={player} />
+        <PlayerDetail player={player} stats={stats?.[player.id]} />
       </Modal>
     </>
   );
 }
 
-function PlayerDetail({ player }) {
+function PlayerDetail({ player, stats }) {
   const bars = useMemo(() => {
     const r = player.rating;
     if (player.role === "BAT" || player.role === "WK") return [["Power", r], ["Timing", Math.min(99, r + 3)], ["Tempo", Math.max(45, r - 8)], ["Consistency", Math.min(99, r + 1)]];
@@ -581,6 +583,7 @@ function PlayerDetail({ player }) {
         <div className="panel-flat p-2.5 text-center"><div className="text-[10px] uppercase tracking-wider text-slate-500">Est. value</div><div className="font-display text-lg text-gold-300"><Money lakhs={Math.round(player.base * (0.9 + Math.min(1, Math.max(0, (player.rating - 58) / 38)) * 5.5) / 5) * 5} /></div></div>
         <div className="panel-flat p-2.5 text-center"><div className="text-[10px] uppercase tracking-wider text-slate-500">Type</div><div className="font-display text-lg text-white">{player.overseas ? "Overseas" : "Domestic"}</div></div>
       </div>
+      <PlayerStatsCard player={player} stats={stats} />
       <p className="rounded-lg border border-white/8 bg-white/3 p-2.5 text-[11.5px] leading-relaxed text-slate-400">
         Estimated value is what the AI owners roughly think this name is worth. Going well above it is a statement
         signing; going well under it is the steal of the night.

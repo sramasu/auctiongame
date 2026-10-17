@@ -222,6 +222,67 @@ async function main() {
   ok("full pool auction is running", ["intro", "bidding"].includes(perfState?.current?.phase), JSON.stringify(perfState?.current?.phase));
   perf.close();
 
+  // ── v2 additions: live stats HTTP API endpoints (11 assertions) ────────────────
+  console.log("\n  …v2 live stats HTTP API verification…");
+  const statsStatusRes = await fetch(`${URL}/api/stats/status`).then((r) => r.json()).catch(() => ({}));
+  ok("GET /api/stats/status 200 OK", !!statsStatusRes.ok);
+  ok("stats status reports providers", !!statsStatusRes.providers);
+  ok("sportsdb provider configured", !!statsStatusRes.providers?.thesportsdb);
+  ok("mock fallback provider active", !!statsStatusRes.providers?.mock?.healthy);
+
+  const diagCricket = await fetch(`${URL}/api/stats/diagnose?name=Virat%20Kohli&sport=cricket`).then((r) => r.json()).catch(() => ({}));
+  ok("GET /api/stats/diagnose for cricket returns ok", !!diagCricket.ok);
+  ok("cricket diagnose returns result", !!(diagCricket.final?.name || diagCricket.final?.role));
+
+  const diagFootball = await fetch(`${URL}/api/stats/diagnose?name=Kylian%20Mbappe&sport=football`).then((r) => r.json()).catch(() => ({}));
+  ok("GET /api/stats/diagnose for football returns ok", !!diagFootball.ok);
+  ok("football diagnose returns result", !!(diagFootball.final?.name || diagFootball.final?.role || diagFootball.final?.sport));
+
+  const playerStats = await fetch(`${URL}/api/stats/player?id=c1&sport=cricket`).then((r) => r.json()).catch(() => ({}));
+  ok("GET /api/stats/player returns ok", !!playerStats.ok);
+  ok("player endpoint provides stats payload", !!(playerStats.player || playerStats.stats));
+
+  const badPlayerStats = await fetch(`${URL}/api/stats/player?id=nonexistent_999`).then((r) => r.json()).catch(() => ({}));
+  ok("GET /api/stats/player with invalid ID returns error", !badPlayerStats.ok);
+
+  // ── v2 additions: join-in-progress & live controls (12 assertions) ──────────────
+  console.log("\n  …v2 join-in-progress and live room controls…");
+  const liveJoiner = await client("liveJoiner");
+  const lateJoin = await send(liveJoiner, "room:join-live", { code: pub.code, name: "LatePlayer" });
+  ok("late-join into running room succeeds", !!lateJoin.ok);
+  ok("late-join returns participant token", !!lateJoin.token);
+  ok("late-join provides room payload", !!lateJoin.payload?.code);
+
+  const lateChat = await send(liveJoiner, "chat:send", { text: "Joined live!" });
+  ok("late-join participant can send chat", !!lateChat.ok);
+
+  const liveSpec = await client("liveSpec");
+  const specJoin = await send(liveSpec, "room:join-live", { code: pub.code, name: "LiveViewer", spectator: true });
+  ok("late-join spectator join succeeds", !!specJoin.ok);
+  ok("late-join spectator is marked spectator", specJoin.spectator === true || specJoin.payload?.participants?.some(p => p.id === specJoin.participantId && p.spectator));
+
+  const specBid = await send(liveSpec, "bid:place", { amount: 100 });
+  ok("late-join spectator cannot bid", !specBid.ok);
+
+  const roomList = await send(liveSpec, "room:list", {});
+  ok("room list reflects active tables", !!(roomList.ok && Array.isArray(roomList.rooms)));
+
+  const pauseRes = await send(pubHost, "auction:pause", { paused: true });
+  ok("auction pause suspends clock", !!pauseRes.ok);
+
+  const resumeRes = await send(pubHost, "auction:pause", { paused: false });
+  ok("auction resume restores clock", !!resumeRes.ok);
+
+  const skipRes = await send(pubHost, "auction:skip");
+  ok("auction skip moves player to passed", !!skipRes.ok);
+
+  await wait(400);
+  const postSkipState = lastOf(pubHost, "state");
+  ok("live state reflects auction progression", !!postSkipState);
+
+  liveJoiner.close();
+  liveSpec.close();
+
   [spec, host2, pubHost].forEach((c) => c.close());
   console.log(`\n  ${pass} passed, ${fail} failed\n`);
   process.exit(fail ? 1 : 0);

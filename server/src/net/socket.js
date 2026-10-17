@@ -11,6 +11,7 @@ import {
 import { onRoomEvent } from "../game/bus.js";
 import { MAX_HUMAN_PLAYERS, MAX_ROOM_PLAYERS } from "../../../shared/constants.js";
 import { ALL_TEAMS } from "../../../shared/teams.js";
+import { getStats } from "../stats/index.js";
 
 const EMPTY_ROOM_TTL = 12 * 60 * 1000;
 
@@ -35,7 +36,17 @@ export function attachSockets(httpServer) {
       case "chat": io.to(room.code).emit("chat", data); break;
       case "reaction": io.to(room.code).emit("reaction", data); break;
       case "phase": io.to(room.code).emit("phase", data); break;
-      case "player": io.to(room.code).emit("player", data); break;
+      case "player": {
+        io.to(room.code).emit("player", data);
+        // Asynchronously fetch stats and push to the room
+        const playerRecord = room.playersMap?.get(data.playerId);
+        if (playerRecord) {
+          getStats(playerRecord, room.sport).then(stats => {
+            io.to(room.code).emit("stats", { playerId: data.playerId, stats });
+          }).catch(() => {});
+        }
+        break;
+      }
       case "start": io.to(room.code).emit("auction-start", data); break;
       case "results": io.to(room.code).emit("results", data); break;
       case "pass": io.to(room.code).emit("pass", data); break;
@@ -147,6 +158,52 @@ export function attachSockets(httpServer) {
       touch(room);
       pushFeed(room, "system", `${p.name} joined as ${p.spectator ? "a spectator" : room.teams[p.teamId]?.name || "an owner"}.`, { teamId: p.teamId });
       ack(cb, { ok: true, code: room.code, participantId: p.id, token: p.token, payload: participantPayload(room) });
+    });
+
+    // room:join-live — join an in-progress auction (takes over a bot slot or spectates).
+    socket.on("room:join-live", (payload = {}, cb) => {
+      const room = getRoom(payload.code);
+      if (!room) return ack(cb, { ok: false, error: "Room not found" });
+      const name = String(payload.name || "").trim().slice(0, 24);
+      if (!name) return ack(cb, { ok: false, error: "Enter your name" });
+
+      if (room.status === "done") return ack(cb, { ok: false, error: "Auction already finished" });
+
+      // Try to find an empty bot slot to take over
+      const botSlot = payload.teamId
+        ? room.participants.find(p => p.isBot && p.teamId === payload.teamId)
+        : room.participants.find(p => p.isBot);
+
+      if (botSlot && !payload.spectator) {
+        // Replace bot with human player
+        botSlot.name = name;
+        botSlot.isBot = false;
+        botSlot.connected = true;
+        botSlot.socketId = socket.id;
+        botSlot.lastSeen = Date.now();
+        socket.data.room = room.code;
+        socket.data.participantId = botSlot.id;
+        socket.data.token = botSlot.token;
+        socket.join(room.code);
+        touch(room);
+        pushFeed(room, "system", `${name} took over ${room.teams[botSlot.teamId]?.name || "a franchise"} mid-auction.`, { teamId: botSlot.teamId });
+        io.to(room.code).emit("participants", {
+          participants: room.participants.map(x => ({ id: x.id, name: x.name, teamId: x.teamId, isHost: x.isHost, isBot: x.isBot, spectator: x.spectator, connected: x.connected }))
+        });
+        return ack(cb, { ok: true, code: room.code, participantId: botSlot.id, token: botSlot.token, tookOver: botSlot.teamId, payload: participantPayload(room) });
+      }
+
+      // No bot slot or explicitly wants spectator
+      const spectators = room.participants.filter(p => p.spectator).length;
+      if (spectators >= 40) return ack(cb, { ok: false, error: "Spectator gallery is full" });
+      const p = addParticipant(room, { name, spectator: true });
+      socket.data.room = room.code;
+      socket.data.participantId = p.id;
+      socket.data.token = p.token;
+      socket.join(room.code);
+      touch(room);
+      pushFeed(room, "system", `${name} joined as a spectator.`);
+      ack(cb, { ok: true, code: room.code, participantId: p.id, token: p.token, spectator: true, payload: participantPayload(room) });
     });
 
     socket.on("room:rejoin", (payload = {}, cb) => {
@@ -434,18 +491,14 @@ export function attachSockets(httpServer) {
       if (!room) return;
       const p = findParticipant(room, socket.data.participantId);
       if (!p) return;
-      if (p.isBot || (p.spectator && room.status === "lobby")) {
-        // bots stay seated; spectators linger
-        p.connected = false;
-        p.socketId = null;
+      p.connected = false;
+      p.socketId = null;
+      if (p.isBot || p.isHost) {
+        // bots and host keep their seat held for reconnect
+      } else if (room.status === "lobby") {
+        removeParticipant(room, p.id);
       } else {
-        p.connected = false;
-        p.socketId = null;
-        if (room.status === "lobby") {
-          removeParticipant(room, p.id);
-        } else {
-          pushFeed(room, "system", `${p.name} lost connection — their seat is held.`);
-        }
+        pushFeed(room, "system", `${p.name} lost connection — their seat is held.`);
       }
       touch(room);
     });
